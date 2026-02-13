@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base64 Encoder / Decoder</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    textarea, .mono { font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+    .swap-btn { transition: transform 0.3s ease; }
+    .swap-btn:hover { transform: rotate(180deg); }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .toast { animation: slideUp 0.3s ease, fadeOut 0.3s ease 1.7s forwards; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
+  <!-- Header -->
+  <header class="pt-10 pb-6 text-center">
+    <div class="inline-flex items-center gap-3 mb-2">
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Base64 Encoder / Decoder</h1>
+    </div>
+    <p class="text-slate-400 text-sm">Encode and decode text instantly in your browser</p>
+  </header>
+  <!-- Main Container -->
+  <main class="max-w-5xl mx-auto px-4 pb-16">
+    <!-- Text Mode -->
+    <div id="text-mode" class="fade-in">
+      <div class="grid md:grid-cols-2 gap-4 relative">
+        <!-- Input Panel -->
+        <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm font-semibold text-slate-300" id="input-label">Plain Text</label>
+            <div class="flex gap-2">
+              <button onclick="pasteFromClipboard()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors text-slate-300 hover:text-white" title="Paste">📋 Paste</button>
+              <button onclick="clearInput()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors text-slate-300 hover:text-white" title="Clear">✕ Clear</button>
+            </div>
+          </div>
+          <textarea id="input-text" rows="10" placeholder="Type or paste your text here..."
+            class="w-full bg-slate-900/60 border border-slate-600 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"></textarea>
+          <div class="mt-2 flex justify-between text-xs text-slate-500">
+            <span id="input-char-count">0 characters</span>
+            <span id="input-byte-count">0 bytes</span>
+          </div>
+        </div>
+        <!-- Swap Button (center) -->
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 hidden md:flex">
+          <button onclick="swapTexts()" class="swap-btn w-12 h-12 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/30 border-4 border-slate-900 text-xl" title="Swap">⇄</button>
+        </div>
+        <!-- Output Panel -->
+        <div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm font-semibold text-slate-300" id="output-label">Base64 Encoded / Decoded</label>
+            <div class="flex gap-2">
+              <button onclick="copyOutput()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors text-slate-300 hover:text-white" title="Copy">📄 Copy</button>
+              <button onclick="downloadOutput()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors text-slate-300 hover:text-white" title="Download">⬇ Save</button>
+            </div>
+          </div>
+          <textarea id="output-text" rows="10" readonly placeholder="Result will appear here..."
+            class="w-full bg-slate-900/60 border border-slate-600 rounded-xl p-4 text-sm text-emerald-300 placeholder-slate-500 resize-none focus:outline-none transition-all cursor-default"></textarea>
+          <div class="mt-2 flex justify-between text-xs text-slate-500">
+            <span id="output-char-count">0 characters</span>
+            <span id="output-byte-count">0 bytes</span>
+          </div>
+        </div>
+      </div>
+      <!-- Swap button for mobile -->
+      <div class="flex md:hidden justify-center -mt-2 mb-2">
+        <button onclick="swapTexts()" class="swap-btn w-10 h-10 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/30 text-lg rotate-90" title="Swap">⇄</button>
+      </div>
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap justify-center gap-3 mt-6">
+        <button onclick="encodeText()" class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 rounded-xl font-semibold text-sm shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0">
+          🔒 Encode to Base64
+        </button>
+        <button onclick="decodeText()" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 rounded-xl font-semibold text-sm shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 hover:-translate-y-0.5 active:translate-y-0">
+          🔓 Decode from Base64
+        </button>
+      </div>
+      <!-- Error message -->
+      <div id="error-msg" class="hidden mt-4 max-w-md mx-auto bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 text-center fade-in"></div>
+    </div>
+    <!-- Info Section -->
+    <div class="mt-16 max-w-3xl mx-auto">
+      <div class="grid sm:grid-cols-3 gap-4">
+        <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+          <div class="text-2xl mb-2">🔐</div>
+          <h3 class="font-semibold text-sm text-slate-200 mb-1">Client-Side Only</h3>
+          <p class="text-xs text-slate-400">Everything runs in your browser. No data is sent to any server.</p>
+        </div>
+        <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+          <div class="text-2xl mb-2">⚡</div>
+          <h3 class="font-semibold text-sm text-slate-200 mb-1">Instant Results</h3>
+          <p class="text-xs text-slate-400">Real-time encoding and decoding with zero latency.</p>
+        </div>
+        <div class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+          <div class="text-2xl mb-2">🔄</div>
+          <h3 class="font-semibold text-sm text-slate-200 mb-1">Swap & Copy</h3>
+          <p class="text-xs text-slate-400">Easily swap input/output and copy results to clipboard.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center"></div>
+  <script>
+    // --- Helpers ---
+    function utf8ToBase64(str) {
+      const bytes = new TextEncoder().encode(str);
+      let binary = '';
+      bytes.forEach(b => binary += String.fromCharCode(b));
+      return btoa(binary);
+    }
+    function base64ToUtf8(b64) {
+      const binary = atob(b64);
+      const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+    function byteSize(str) {
+      return new Blob([str]).size;
+    }
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 bytes';
+      const k = 1024, sizes = ['bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    function updateCounts() {
+      const input = document.getElementById('input-text').value;
+      const output = document.getElementById('output-text').value;
+      document.getElementById('input-char-count').textContent = input.length + ' characters';
+      document.getElementById('input-byte-count').textContent = formatBytes(byteSize(input));
+      document.getElementById('output-char-count').textContent = output.length + ' characters';
+      document.getElementById('output-byte-count').textContent = formatBytes(byteSize(output));
+    }
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+    function hideError() {
+      document.getElementById('error-msg').classList.add('hidden');
+    }
+    function showToast(msg, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = type === 'success' ? 'bg-emerald-600/90 border-emerald-500' : 'bg-red-600/90 border-red-500';
+      toast.className = `toast ${colors} border backdrop-blur px-5 py-2.5 rounded-xl text-sm font-medium shadow-xl`;
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 2000);
+    }
+    // --- Text Encode/Decode ---
+    function encodeText() {
+      hideError();
+      const input = document.getElementById('input-text').value;
+      if (!input) { showError('Please enter some text to encode.'); return; }
+      try {
+        const encoded = utf8ToBase64(input);
+        document.getElementById('output-text').value = encoded;
+        updateCounts();
+        showToast('Encoded successfully!');
+      } catch (e) {
+        showError('Encoding failed: ' + e.message);
+      }
+    }
+    function decodeText() {
+      hideError();
+      const input = document.getElementById('input-text').value.trim();
+      if (!input) { showError('Please enter a Base64 string to decode.'); return; }
+      try {
+        const decoded = base64ToUtf8(input);
+        document.getElementById('output-text').value = decoded;
+        updateCounts();
+        showToast('Decoded successfully!');
+      } catch (e) {
+        showError('Invalid Base64 string. Please check your input.');
+      }
+    }
+    function swapTexts() {
+      const inputEl = document.getElementById('input-text');
+      const outputEl = document.getElementById('output-text');
+      const tmp = inputEl.value;
+      inputEl.value = outputEl.value;
+      outputEl.value = tmp;
+      updateCounts();
+    }
+    function clearInput() {
+      document.getElementById('input-text').value = '';
+      document.getElementById('output-text').value = '';
+      hideError();
+      updateCounts();
+    }
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('input-text').value = text;
+        updateCounts();
+        showToast('Pasted from clipboard!');
+      } catch {
+        showToast('Clipboard access denied', 'error');
+      }
+    }
+    function copyOutput() {
+      const text = document.getElementById('output-text').value;
+      if (!text) { showToast('Nothing to copy', 'error'); return; }
+      navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+    }
+    function downloadOutput() {
+      const text = document.getElementById('output-text').value;
+      if (!text) { showToast('Nothing to download', 'error'); return; }
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'base64-output.txt';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('Download started!');
+    }
+    // Live character count
+    document.getElementById('input-text').addEventListener('input', updateCounts);
+    document.getElementById('output-text').addEventListener('input', updateCounts);
+  </script>
+</body>
+</html>
