@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOTP Calculator</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @keyframes shrink {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+    .countdown-bar {
+      animation: shrink linear forwards;
+    }
+    .code-digit {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .code-digit:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(99,102,241,0.3);
+    }
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center p-4">
+  <div class="w-full max-w-lg">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-500/20 mb-4">
+        <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+      </div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">TOTP Calculator</h1>
+      <p class="text-slate-400 mt-1">Time-based One-Time Password Generator</p>
+    </div>
+
+    <!-- Main Card -->
+    <div class="bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-700/50 overflow-hidden">
+      <!-- Secret Input -->
+      <div class="p-6 pb-4">
+        <label class="block text-sm font-semibold text-slate-300 mb-2">Secret Key (Base32)</label>
+        <div class="flex gap-2">
+          <input
+            id="secretInput"
+            type="text"
+            placeholder="e.g. JBSWY3DPEHPK3PXP"
+            spellcheck="false"
+            class="flex-1 bg-slate-900/60 border border-slate-600/50 text-white rounded-xl px-4 py-3 font-mono text-sm tracking-widest placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all uppercase"
+          />
+          <button
+            id="toggleVisibility"
+            title="Toggle visibility"
+            class="px-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
+          >
+            <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Settings Row -->
+      <div class="px-6 pb-4 flex gap-3">
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Digits</label>
+          <select id="digitsSelect" class="w-full bg-slate-900/60 border border-slate-600/50 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+            <option value="6" selected>6 digits</option>
+            <option value="8">8 digits</option>
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Period</label>
+          <select id="periodSelect" class="w-full bg-slate-900/60 border border-slate-600/50 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+            <option value="30" selected>30 seconds</option>
+            <option value="60">60 seconds</option>
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5">Algorithm</label>
+          <select id="algoSelect" class="w-full bg-slate-900/60 border border-slate-600/50 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+            <option value="SHA-1" selected>SHA-1</option>
+            <option value="SHA-256">SHA-256</option>
+            <option value="SHA-512">SHA-512</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="mx-6 border-t border-slate-700/50"></div>
+
+      <!-- TOTP Display -->
+      <div class="p-6">
+        <div class="text-center">
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Your One-Time Password</p>
+          <div id="codeDisplay" class="flex justify-center gap-2 mb-5 cursor-pointer" title="Click to copy">
+            <!-- Digits injected by JS -->
+          </div>
+          <div id="copiedToast" class="text-emerald-400 text-sm font-medium opacity-0 transition-opacity duration-300 mb-3">
+            ✓ Copied to clipboard!
+          </div>
+          <div id="errorMsg" class="text-red-400 text-sm font-medium mb-3 hidden"></div>
+        </div>
+
+        <!-- Countdown Bar -->
+        <div class="relative">
+          <div class="flex justify-between text-xs text-slate-400 mb-1.5">
+            <span>Time remaining</span>
+            <span id="secondsLeft">--s</span>
+          </div>
+          <div class="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-colors duration-500"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center text-slate-500 text-xs mt-6">
+      All calculations are performed locally in your browser. No data is sent to any server.
+    </p>
+  </div>
+
+  <script>
+    // --- Base32 Decode ---
+    function base32Decode(input) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      let cleaned = input.toUpperCase().replace(/[^A-Z2-7]/g, '');
+      if (cleaned.length === 0) throw new Error('Empty secret key');
+
+      let bits = '';
+      for (const ch of cleaned) {
+        const val = alphabet.indexOf(ch);
+        if (val === -1) throw new Error('Invalid Base32 character: ' + ch);
+        bits += val.toString(2).padStart(5, '0');
+      }
+      const bytes = new Uint8Array(Math.floor(bits.length / 8));
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+      }
+      return bytes;
+    }
+
+    // --- HMAC ---
+    async function hmac(algorithm, key, message) {
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw', key, { name: 'HMAC', hash: algorithm }, false, ['sign']
+      );
+      const sig = await crypto.subtle.sign('HMAC', cryptoKey, message);
+      return new Uint8Array(sig);
+    }
+
+    // --- TOTP ---
+    async function generateTOTP(secret, period, digits, algorithm) {
+      const key = base32Decode(secret);
+      const epoch = Math.floor(Date.now() / 1000);
+      const counter = Math.floor(epoch / period);
+
+      // counter to 8-byte big-endian
+      const msg = new Uint8Array(8);
+      let tmp = counter;
+      for (let i = 7; i >= 0; i--) {
+        msg[i] = tmp & 0xff;
+        tmp = Math.floor(tmp / 256);
+      }
+
+      const hash = await hmac(algorithm, key, msg);
+
+      // Dynamic truncation
+      const offset = hash[hash.length - 1] & 0x0f;
+      const binary =
+        ((hash[offset] & 0x7f) << 24) |
+        ((hash[offset + 1] & 0xff) << 16) |
+        ((hash[offset + 2] & 0xff) << 8) |
+        (hash[offset + 3] & 0xff);
+
+      const otp = binary % Math.pow(10, digits);
+      return otp.toString().padStart(digits, '0');
+    }
+
+    // --- DOM ---
+    const secretInput = document.getElementById('secretInput');
+    const digitsSelect = document.getElementById('digitsSelect');
+    const periodSelect = document.getElementById('periodSelect');
+    const algoSelect = document.getElementById('algoSelect');
+    const codeDisplay = document.getElementById('codeDisplay');
+    const progressBar = document.getElementById('progressBar');
+    const secondsLeft = document.getElementById('secondsLeft');
+    const copiedToast = document.getElementById('copiedToast');
+    const errorMsg = document.getElementById('errorMsg');
+    const toggleVisibility = document.getElementById('toggleVisibility');
+
+    let currentCode = '';
+    let isHidden = false;
+
+    function getDigits() { return parseInt(digitsSelect.value); }
+    function getPeriod() { return parseInt(periodSelect.value); }
+    function getAlgo() { return algoSelect.value; }
+
+    function renderCode(code, hidden) {
+      const digits = code.split('');
+      codeDisplay.innerHTML = '';
+      digits.forEach((d, i) => {
+        const span = document.createElement('span');
+        span.className = 'code-digit inline-flex items-center justify-center w-12 h-16 bg-slate-900/80 border border-slate-600/40 rounded-xl text-3xl font-bold text-white font-mono select-none';
+        span.textContent = hidden ? '•' : d;
+        // Add a gap in the middle
+        if (i === Math.floor(digits.length / 2) - 1) {
+          span.style.marginRight = '8px';
+        }
+        codeDisplay.appendChild(span);
+      });
+    }
+
+    function renderPlaceholder() {
+      const n = getDigits();
+      codeDisplay.innerHTML = '';
+      for (let i = 0; i < n; i++) {
+        const span = document.createElement('span');
+        span.className = 'code-digit inline-flex items-center justify-center w-12 h-16 bg-slate-900/80 border border-slate-600/40 rounded-xl text-3xl font-bold text-slate-600 font-mono select-none';
+        span.textContent = '-';
+        if (i === Math.floor(n / 2) - 1) span.style.marginRight = '8px';
+        codeDisplay.appendChild(span);
+      }
+    }
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.remove('hidden');
+    }
+    function hideError() {
+      errorMsg.classList.add('hidden');
+    }
+
+    async function updateCode() {
+      const secret = secretInput.value.trim();
+      if (!secret) {
+        currentCode = '';
+        renderPlaceholder();
+        hideError();
+        return;
+      }
+      try {
+        const code = await generateTOTP(secret, getPeriod(), getDigits(), getAlgo());
+        currentCode = code;
+        renderCode(code, isHidden);
+        hideError();
+      } catch (e) {
+        currentCode = '';
+        renderPlaceholder();
+        showError('Invalid secret key. Please enter a valid Base32 string.');
+      }
+    }
+
+    function updateProgress() {
+      const period = getPeriod();
+      const epoch = Math.floor(Date.now() / 1000);
+      const remaining = period - (epoch % period);
+      const pct = (remaining / period) * 100;
+
+      secondsLeft.textContent = remaining + 's';
+      progressBar.style.width = pct + '%';
+
+      // Color shifts when low
+      if (remaining <= 5) {
+        progressBar.className = 'h-full rounded-full bg-gradient-to-r from-red-500 to-orange-500 transition-colors duration-500';
+      } else if (remaining <= 10) {
+        progressBar.className = 'h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-colors duration-500';
+      } else {
+        progressBar.className = 'h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-colors duration-500';
+      }
+
+      return remaining;
+    }
+
+    // Copy to clipboard
+    codeDisplay.addEventListener('click', async () => {
+      if (!currentCode) return;
+      try {
+        await navigator.clipboard.writeText(currentCode);
+        copiedToast.style.opacity = '1';
+        setTimeout(() => { copiedToast.style.opacity = '0'; }, 1800);
+      } catch {}
+    });
+
+    // Toggle visibility
+    toggleVisibility.addEventListener('click', () => {
+      isHidden = !isHidden;
+      if (currentCode) renderCode(currentCode, isHidden);
+      document.getElementById('eyeIcon').innerHTML = isHidden
+        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18"/>'
+        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+    });
+
+    // Re-generate on input changes
+    secretInput.addEventListener('input', updateCode);
+    digitsSelect.addEventListener('change', updateCode);
+    periodSelect.addEventListener('change', updateCode);
+    algoSelect.addEventListener('change', updateCode);
+
+    // Main loop
+    let lastCounter = -1;
+    function tick() {
+      const period = getPeriod();
+      const counter = Math.floor(Math.floor(Date.now() / 1000) / period);
+      updateProgress();
+      if (counter !== lastCounter) {
+        lastCounter = counter;
+        updateCode();
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // Init
+    renderPlaceholder();
+    tick();
+  </script>
+</body>
+</html>
